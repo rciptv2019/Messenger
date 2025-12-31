@@ -1,0 +1,5 @@
+{
+  "name": "CipherNet - Anonymous & End-to-End Encrypted Messenger",
+  "description": "A zero-knowledge, privacy-first messaging application that requires no personal data. Messages are encrypted using client-side AES-GCM with pre-shared keys.",
+  "requestFramePermissions": []
+}
