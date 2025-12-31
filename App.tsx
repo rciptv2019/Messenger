@@ -14,63 +14,48 @@ const App: React.FC = () => {
   const [activeContact, setActiveContact] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [contacts, setContacts] = useState<User[]>([]);
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newPeerName, setNewPeerName] = useState('');
+  const [newPeerId, setNewPeerId] = useState('');
 
   // Load state on mount
   useEffect(() => {
-    const savedUser = localStorage.getItem('ciphernet_user_v2');
+    const savedUser = localStorage.getItem('ciphernet_user_v3');
     if (savedUser) {
       try {
         setAuthState({ user: JSON.parse(savedUser), isAuthenticated: true });
       } catch (e) {
-        console.error("Failed to parse saved user", e);
+        console.error("Restore failed", e);
       }
     }
-    const savedMessages = localStorage.getItem('ciphernet_messages_v2');
-    if (savedMessages) {
-      setMessages(JSON.parse(savedMessages));
-    }
-    const savedContacts = localStorage.getItem('ciphernet_contacts_v2');
-    if (savedContacts) {
-      setContacts(JSON.parse(savedContacts));
-    }
+    const savedMessages = localStorage.getItem('ciphernet_messages_v3');
+    if (savedMessages) setMessages(JSON.parse(savedMessages));
+    
+    const savedContacts = localStorage.getItem('ciphernet_contacts_v3');
+    if (savedContacts) setContacts(JSON.parse(savedContacts));
   }, []);
 
-  // Persist state changes
+  // Persist state
   useEffect(() => {
     if (authState.user) {
-      localStorage.setItem('ciphernet_user_v2', JSON.stringify(authState.user));
+      localStorage.setItem('ciphernet_user_v3', JSON.stringify(authState.user));
     }
-    localStorage.setItem('ciphernet_messages_v2', JSON.stringify(messages));
-    localStorage.setItem('ciphernet_contacts_v2', JSON.stringify(contacts));
+    localStorage.setItem('ciphernet_messages_v3', JSON.stringify(messages));
+    localStorage.setItem('ciphernet_contacts_v3', JSON.stringify(contacts));
   }, [authState.user, messages, contacts]);
 
   const handleLogin = (username: string, id: string) => {
-    let finalId = id;
-    
-    // If we're attempting a restore and no manual ID was provided, check local storage
-    if (!finalId) {
-      const saved = localStorage.getItem('ciphernet_user_v2');
-      if (saved) {
-        finalId = JSON.parse(saved).id;
-      }
-    }
-
-    if (!finalId) {
-      alert("No Identity ID detected. Please generate a new identity or provide your existing Hex ID.");
-      return;
-    }
-    
     setAuthState({
-      user: { username, id: finalId },
+      user: { username, id },
       isAuthenticated: true
     });
   };
 
   const handleLogout = () => {
-    if (confirm("Logout will hide your identity locally. Wipe all session data (messages/contacts) too?")) {
-      localStorage.removeItem('ciphernet_user_v2');
-      localStorage.removeItem('ciphernet_messages_v2');
-      localStorage.removeItem('ciphernet_contacts_v2');
+    if (confirm("Logout will hide your identity locally. Wipe session data too?")) {
+      localStorage.clear();
       setMessages([]);
       setContacts([]);
     }
@@ -78,9 +63,21 @@ const App: React.FC = () => {
     setActiveContact(null);
   };
 
+  const handleAddPeer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPeerName && newPeerId) {
+      const cleanedId = newPeerId.trim();
+      if (!contacts.find(c => c.id === cleanedId)) {
+        setContacts(prev => [...prev, { username: newPeerName, id: cleanedId }]);
+      }
+      setNewPeerName('');
+      setNewPeerId('');
+      setIsModalOpen(false);
+    }
+  };
+
   const handleSendMessage = useCallback((encrypted: string, iv: string) => {
     if (!authState.user || !activeContact) return;
-
     const newMessage: Message = {
       id: crypto.randomUUID(),
       senderId: authState.user.id,
@@ -89,25 +86,8 @@ const App: React.FC = () => {
       iv: iv,
       timestamp: Date.now()
     };
-
     setMessages(prev => [...prev, newMessage]);
   }, [authState.user, activeContact]);
-
-  const addContact = () => {
-    const name = prompt("Peer Pseudonym (Display Name):");
-    const peerId = prompt("Enter Peer Identity ID (Hex):");
-    
-    if (name && peerId) {
-      if (peerId.trim().length < 8) {
-        alert("Invalid ID length. IDs must be secure Hex strings.");
-        return;
-      }
-      const cleanedId = peerId.trim();
-      if (!contacts.find(c => c.id === cleanedId)) {
-        setContacts(prev => [...prev, { username: name, id: cleanedId }]);
-      }
-    }
-  };
 
   if (!authState.isAuthenticated) {
     return (
@@ -124,14 +104,14 @@ const App: React.FC = () => {
 
   return (
     <Layout>
-      <div className="flex w-full h-full">
+      <div className="flex w-full h-full relative">
         <Sidebar 
           currentUser={authState.user}
           contacts={contacts}
           activeContact={activeContact}
           onSelectContact={setActiveContact}
           onLogout={handleLogout}
-          onAddContact={addContact}
+          onAddContact={() => setIsModalOpen(true)}
         />
         
         {activeContact ? (
@@ -153,12 +133,57 @@ const App: React.FC = () => {
                 Add a peer node using their unique Identity ID. Your shared key combined with your unique IDs creates a mathematically unique encryption tunnel.
               </p>
               <button 
-                onClick={addContact}
+                onClick={() => setIsModalOpen(true)}
                 className="px-6 py-3 bg-indigo-600/10 border border-indigo-600/30 text-indigo-400 rounded-xl text-xs font-bold hover:bg-indigo-600/20 transition-all flex items-center gap-2 mx-auto"
               >
                 <i className="fas fa-plus-circle"></i>
                 Link Peer Node
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Modal for Adding Peer */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-zinc-100">Establish New Link</h3>
+                <button onClick={() => setIsModalOpen(false)} className="text-zinc-500 hover:text-white">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              <form onSubmit={handleAddPeer} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-zinc-500">Peer Display Name</label>
+                  <input
+                    autoFocus
+                    required
+                    type="text"
+                    value={newPeerName}
+                    onChange={(e) => setNewPeerName(e.target.value)}
+                    placeholder="e.g. Agent Smith"
+                    className="w-full h-12 bg-zinc-950 border border-zinc-800 rounded-xl px-4 text-sm text-zinc-200 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-zinc-500">Peer Identity ID (Hex)</label>
+                  <input
+                    required
+                    type="text"
+                    value={newPeerId}
+                    onChange={(e) => setNewPeerId(e.target.value)}
+                    placeholder="Paste the unique ID here..."
+                    className="w-full h-12 bg-zinc-950 border border-zinc-800 rounded-xl px-4 text-xs font-mono text-indigo-400 focus:ring-1 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full h-14 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20"
+                >
+                  ADD PEER NODE
+                </button>
+              </form>
             </div>
           </div>
         )}

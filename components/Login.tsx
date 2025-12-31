@@ -16,16 +16,21 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     e.preventDefault();
     if (username && password) {
       if (isRegistering) {
-        // Registration: Generate a completely new unique ID
         const newId = cryptoService.generateIdentity();
         onLogin(username, newId);
       } else {
-        // Restore: Use provided manual ID or try to rely on parent logic
-        if (!manualId && !localStorage.getItem('ciphernet_user_v2')) {
-          alert("Please provide your Identity ID to restore session.");
+        // Restore from storage or manual entry
+        let finalId = manualId;
+        if (!finalId) {
+          const cached = localStorage.getItem('ciphernet_user_v3');
+          if (cached) finalId = JSON.parse(cached).id;
+        }
+        
+        if (!finalId) {
+          alert("Could not find a local identity. Please paste your Identity ID.");
           return;
         }
-        onLogin(username, manualId);
+        onLogin(username, finalId);
       }
     }
   };
@@ -42,7 +47,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="text-center mt-6 mb-8">
           <h1 className="text-3xl font-bold tracking-tighter text-zinc-100">CipherNet</h1>
           <p className="text-zinc-500 text-sm mt-2 font-mono uppercase tracking-widest">
-            {isRegistering ? 'Generate Secure Identity' : 'Restore Stealth Session'}
+            {isRegistering ? 'Create Secure Identity' : 'Restore Stealth Session'}
           </p>
         </div>
 
@@ -54,7 +59,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <input
                 type="text"
                 required
-                placeholder="Choose a display name..."
+                placeholder="How should peers see you?"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full h-12 bg-zinc-950 border border-zinc-800 rounded-xl pl-11 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-zinc-200"
@@ -69,7 +74,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <input
                 type="password"
                 required
-                placeholder="Secure local access key..."
+                placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full h-12 bg-zinc-950 border border-zinc-800 rounded-xl pl-11 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-zinc-200"
@@ -78,8 +83,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
 
           {!isRegistering && (
-            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
-              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 px-1">Your Identity ID (Optional if cached)</label>
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 px-1">Identity ID (Optional if cached)</label>
               <div className="relative">
                 <i className="fas fa-fingerprint absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"></i>
                 <input
@@ -97,18 +102,19 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             type="submit"
             className="w-full h-14 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
           >
-            {isRegistering ? 'CREATE NEW ID' : 'AUTHENTICATE'}
+            {isRegistering ? 'CREATE NEW IDENTITY' : 'RESTORE SESSION'}
             <i className={`fas ${isRegistering ? 'fa-bolt' : 'fa-right-to-bracket'} text-xs opacity-50`}></i>
           </button>
         </form>
 
         <div className="mt-8 text-center">
           <button 
+            type="button"
             onClick={() => setIsRegistering(!isRegistering)}
             className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center justify-center gap-2 mx-auto"
           >
             <i className="fas fa-shuffle text-[10px]"></i>
-            {isRegistering ? 'Already have an Identity ID?' : 'Need to vanish? Create new ID'}
+            {isRegistering ? 'Have an Identity ID?' : 'Create new identity'}
           </button>
         </div>
       </div>
