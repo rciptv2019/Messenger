@@ -3,21 +3,30 @@ import React, { useState } from 'react';
 import { cryptoService } from '../services/cryptoService';
 
 interface LoginProps {
-  onLogin: (username: string, id?: string) => void;
+  onLogin: (username: string, id: string) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [manualId, setManualId] = useState('');
+  const [isRegistering, setIsRegistering] = useState(true);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (username && password) {
-      // In registration mode, we generate a fresh ID. 
-      // In resume mode, we'd normally look it up, but for this demo 
-      // we'll check localStorage in the parent.
-      onLogin(username, isRegistering ? cryptoService.generateIdentity() : undefined);
+      if (isRegistering) {
+        // Registration: Generate a completely new unique ID
+        const newId = cryptoService.generateIdentity();
+        onLogin(username, newId);
+      } else {
+        // Restore: Use provided manual ID or try to rely on parent logic
+        if (!manualId && !localStorage.getItem('ciphernet_user_v2')) {
+          alert("Please provide your Identity ID to restore session.");
+          return;
+        }
+        onLogin(username, manualId);
+      }
     }
   };
 
@@ -30,57 +39,76 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <i className="fas fa-user-shield text-3xl text-white"></i>
         </div>
 
-        <div className="text-center mt-6 mb-10">
+        <div className="text-center mt-6 mb-8">
           <h1 className="text-3xl font-bold tracking-tighter text-zinc-100">CipherNet</h1>
-          <p className="text-zinc-500 text-sm mt-2 font-mono uppercase tracking-widest">ID-Based Stealth Chat</p>
+          <p className="text-zinc-500 text-sm mt-2 font-mono uppercase tracking-widest">
+            {isRegistering ? 'Generate Secure Identity' : 'Restore Stealth Session'}
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 px-1">Identity Pseudonym</label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 px-1">Pseudonym</label>
             <div className="relative">
               <i className="fas fa-ghost absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"></i>
               <input
                 type="text"
                 required
-                placeholder="How should peers see you?"
+                placeholder="Choose a display name..."
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full h-14 bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-zinc-200"
+                className="w-full h-12 bg-zinc-950 border border-zinc-800 rounded-xl pl-11 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-zinc-200"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 px-1">Local Passkey (to lock storage)</label>
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 px-1">Passkey</label>
             <div className="relative">
               <i className="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"></i>
               <input
                 type="password"
                 required
-                placeholder="••••••••••••"
+                placeholder="Secure local access key..."
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-14 bg-zinc-950 border border-zinc-800 rounded-xl pl-12 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-zinc-200"
+                className="w-full h-12 bg-zinc-950 border border-zinc-800 rounded-xl pl-11 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-zinc-200"
               />
             </div>
           </div>
 
+          {!isRegistering && (
+            <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-300">
+              <label className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 px-1">Your Identity ID (Optional if cached)</label>
+              <div className="relative">
+                <i className="fas fa-fingerprint absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600"></i>
+                <input
+                  type="text"
+                  placeholder="Paste your hex ID here..."
+                  value={manualId}
+                  onChange={(e) => setManualId(e.target.value)}
+                  className="w-full h-12 bg-zinc-950 border border-zinc-800 rounded-xl pl-11 pr-4 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all text-indigo-400"
+                />
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
-            className="w-full h-14 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
+            className="w-full h-14 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-3"
           >
-            {isRegistering ? 'GENERATE NEW IDENTITY' : 'RESTORE SESSION'}
-            <i className="fas fa-bolt-lightning text-xs opacity-50"></i>
+            {isRegistering ? 'CREATE NEW ID' : 'AUTHENTICATE'}
+            <i className={`fas ${isRegistering ? 'fa-bolt' : 'fa-right-to-bracket'} text-xs opacity-50`}></i>
           </button>
         </form>
 
         <div className="mt-8 text-center">
           <button 
             onClick={() => setIsRegistering(!isRegistering)}
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors flex items-center justify-center gap-2 mx-auto"
           >
-            {isRegistering ? 'Already have an identity ID?' : 'Wipe local session & Create new ID'}
+            <i className="fas fa-shuffle text-[10px]"></i>
+            {isRegistering ? 'Already have an Identity ID?' : 'Need to vanish? Create new ID'}
           </button>
         </div>
       </div>
